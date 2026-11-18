@@ -1,0 +1,41 @@
+name: Validate Awesome List
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-links-and-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify bilingual parity & GitHub URLs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'EOF'
+          import re, pathlib, sys
+
+          en = pathlib.Path("README.md").read_text(encoding="utf-8")
+          zh = pathlib.Path("README_zh.md").read_text(encoding="utf-8")
+
+          url_pat = re.compile(r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)")
+          en_repos = set(url_pat.findall(en))
+          zh_repos = set(url_pat.findall(zh))
+
+          if not en_repos:
+              print("ERROR: No GitHub repositories found in README.md", file=sys.stderr)
+              sys.exit(1)
+
+          only_en = en_repos - zh_repos
+          only_zh = zh_repos - en_repos
+          if only_en or only_zh:
+              print(f"ERROR: Bilingual repository mismatch!\nOnly in README.md: {sorted(only_en)}\nOnly in README_zh.md: {sorted(only_zh)}", file=sys.stderr)
+              sys.exit(1)
+
+          print(f"Validated {len(en_repos)} unique GitHub repositories across README.md and README_zh.md.")
+          EOF
